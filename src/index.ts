@@ -33,7 +33,14 @@ class MediumMcpServer {
         title: z.string().min(1, "Title is required"),
         content: z.string().min(10, "Content must be at least 10 characters"),
         tags: z.array(z.string()).optional(),
-        isDraft: z.boolean().optional().default(false)
+        isDraft: z.boolean().optional().default(false),
+        postId: z.string().optional(),
+        coverImageQuery: z.string().optional().describe("Unsplash search query for a cover image"),
+        coverImageQueryCaption: z.string().optional().describe("Caption for the Unsplash image"),
+        coverImageFile: z.string().optional().describe("Absolute path to a local image file to use as cover"),
+        coverImageFileCaption: z.string().optional().describe("Caption for the local file image"),
+        coverImageYoutubeUrl: z.string().optional().describe("YouTube URL to embed as cover (pasted on empty line, Medium auto-embeds)"),
+        coverImageYoutubeCaption: z.string().optional().describe("Caption for the YouTube embed")
       },
       async (args) => {
         try {
@@ -41,7 +48,14 @@ class MediumMcpServer {
             title: args.title,
             content: args.content,
             tags: args.tags,
-            isDraft: args.isDraft
+            isDraft: args.isDraft,
+            postId: args.postId,
+            coverImageQuery: args.coverImageQuery,
+            coverImageQueryCaption: args.coverImageQueryCaption,
+            coverImageFile: args.coverImageFile,
+            coverImageFileCaption: args.coverImageFileCaption,
+            coverImageYoutubeUrl: args.coverImageYoutubeUrl,
+            coverImageYoutubeCaption: args.coverImageYoutubeCaption
           });
 
           return {
@@ -194,6 +208,27 @@ class MediumMcpServer {
         }
       }
     );
+
+    this.server.tool(
+      "delete-draft",
+      "Delete a Medium draft story by post ID",
+      {
+        postId: z.string().describe("The post ID of the draft to delete (e.g. '33c4b72b72b9')")
+      },
+      async (args) => {
+        try {
+          const result = await this.mediumClient.deleteDraft(args.postId);
+          return {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+          };
+        } catch (error: any) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Delete error: ${error.message}` }]
+          };
+        }
+      }
+    );
   }
 
   // Method to start the server
@@ -221,18 +256,23 @@ class MediumMcpServer {
 // Main execution
 async function main() {
   const server = new MediumMcpServer();
-  
-  // Handle graceful shutdown
-  process.on('SIGINT', async () => {
-    console.error("🛑 Shutting down Medium MCP Server...");
-    await server.cleanup();
-    process.exit(0);
-  });
 
-  process.on('SIGTERM', async () => {
-    console.error("🛑 Shutting down Medium MCP Server...");
+  const shutdown = async (signal: string) => {
+    console.error(`🛑 Shutting down Medium MCP Server (${signal})...`);
     await server.cleanup();
     process.exit(0);
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+  // When the MCP host closes the connection (stdin EOF), shut down cleanly
+  process.stdin.on('close', () => shutdown('stdin close'));
+  process.stdin.on('end', () => shutdown('stdin end'));
+
+  // Last-resort synchronous cleanup on exit (browser may already be closed)
+  process.on('exit', () => {
+    try { server.cleanup(); } catch { /* ignore */ }
   });
 
   await server.start();
