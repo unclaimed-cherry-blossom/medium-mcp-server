@@ -20,7 +20,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server for Medium. 
 ## Installation
 
 ```bash
-git clone https://github.com/jackyckma/medium-mcp-server.git
+git clone https://github.com/unclaimed-cherry-blossom/medium-mcp-server.git
 cd medium-mcp-server
 npm install
 npx playwright install chromium

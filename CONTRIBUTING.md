@@ -13,7 +13,7 @@ Thank you for your interest in contributing to Medium MCP Server! This project h
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/jackyckma/medium-mcp-server.git
+   git clone https://github.com/unclaimed-cherry-blossom/medium-mcp-server.git
    cd medium-mcp-server
    ```
 
