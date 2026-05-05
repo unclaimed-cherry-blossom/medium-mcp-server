@@ -1,252 +1,161 @@
 # <img src="https://cdn-static-1.medium.com/_/fp/icons/Medium-Avatar-500x500.svg" alt="Medium Logo" width="32" height="32"> Medium MCP Server (Browser-Based)
 
-## Overview
-Medium MCP (Model Context Protocol) is a browser-based solution for programmatically interacting with Medium's content ecosystem. Since Medium discontinued their public API for new users, this server uses browser automation to provide intelligent and context-aware content management.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server for Medium. Since Medium discontinued their public API for new users, this server drives a real Chromium browser via Playwright to publish, read, and manage your Medium stories — no API token required.
 
-## 🔄 Why Browser-Based?
-Medium stopped issuing new API tokens in 2023, making traditional API integration impossible for new developers. This implementation uses Playwright browser automation to:
-- ✅ **Work without API tokens** - Uses your existing Medium login session
-- ✅ **Full functionality** - Publish, search, and manage your Medium content
-- ✅ **Secure** - Saves your login session locally for reuse
-- ✅ **Interactive** - Opens browser for initial login, then runs headlessly
+## Features
 
-## 📖 Deep Dive Article
-Want to understand the full story behind Medium MCP? Check out the comprehensive article:
+- **Publish articles** — title, body (markdown-like syntax), tags, draft or live
+- **Cover media** — Unsplash search, local file upload, or YouTube embed, with optional captions; all three can be combined in a single call
+- **Read articles** — extract full content from published articles and draft editor URLs
+- **List articles** — fetch your published stories and drafts with `postId` values
+- **Search** — search Medium by keywords
+- **Delete drafts** — with a hard guardrail that refuses to delete published articles
+- **GitHub Copilot CLI skill** — drop-in skill for the Copilot CLI agent at `.copilot/skills/medium-publish/SKILL.md`
 
-[From Thought to Published: How MediumMCP Streamlines the AI-to-Medium Platform Workflow](https://dishantragav27.medium.com/from-thought-to-published-how-mediummcp-streamlines-the-ai-to-medium-platform-workflow-9e436159d1a2)
+## Prerequisites
 
-## Key Features
-- 🤖 **Browser automation** for Medium interaction
-- 📝 **Article publishing** with title, content, and tags
-- 📚 **Retrieve your articles** from your Medium profile
-- 🔍 **Search Medium articles** by keywords
-- 💾 **Session persistence** - login once, use everywhere
-- 🎯 **Claude integration** via Model Context Protocol
+- Node.js 18+
+- A Medium account (email/password login recommended — Google login sessions are less persistent)
 
-## Technology Stack
-- TypeScript
-- Model Context Protocol (MCP)
-- Playwright Browser Automation
-- Advanced Content Parsing
+## Installation
 
-## Getting Started
-
-### Prerequisites
-- Node.js (v16 or later)
-- npm or yarn
-- A Medium account (no API credentials needed!)
-
-### Installation
 ```bash
-# Clone the repository
 git clone https://github.com/jackyckma/medium-mcp-server.git
-
-# Navigate to the project directory
 cd medium-mcp-server
-
-# Install dependencies
 npm install
-
-# Install browser for automation
 npx playwright install chromium
-
-# Build the project
 npm run build
 ```
 
-### Configuration
-No API keys needed! The server will prompt you to login to Medium in your browser on first use.
+## MCP Configuration
 
-### Usage
+Add to your MCP client config (Claude Desktop, GitHub Copilot CLI, etc.):
 
-#### Test the Browser Client
-```bash
-# Test the browser automation (optional)
-node test-browser.js
-```
-
-#### Start the MCP Server
-```bash
-npm start
-```
-
-#### Add to Claude Configuration
-Add this to your Claude MCP configuration:
 ```json
 {
   "mcpServers": {
     "medium-mcp": {
       "command": "node",
-      "args": ["path/to/medium-mcp-server/dist/index.js"],
-      "cwd": "path/to/medium-mcp-server"
+      "args": ["/absolute/path/to/medium-mcp-server/dist/index.js"],
+      "cwd": "/absolute/path/to/medium-mcp-server"
     }
   }
 }
 ```
 
-## Available MCP Tools
+## First-time login
 
-### 1. `publish-article`
-Publish a new article to Medium
-```typescript
-{
-  title: string,      // Article title
-  content: string,    // Article content (markdown supported)
-  tags?: string[],    // Optional tags
-  isDraft?: boolean   // Save as draft (default: false)
-}
+Call `login-to-medium` once. A browser window opens — log in manually. The session is saved to `medium-session.json` and reused on all subsequent calls.
+
+## Available tools
+
+### `login-to-medium`
+Opens a browser window for manual login. Always call this first.
+
+### `publish-article`
+
+| Parameter | Type | Description |
+|---|---|---|
+| `title` | `string` | Article title |
+| `content` | `string` | Article body (see formatting syntax below) |
+| `isDraft` | `boolean` | `true` = save as draft (default: `false`) |
+| `tags` | `string[]` | Up to 5 tags (applied at publish time) |
+| `postId` | `string` | Existing draft ID — skips editor, goes straight to submission |
+| `coverImageYoutubeUrl` | `string` | YouTube URL to embed as cover |
+| `coverImageYoutubeCaption` | `string` | Caption for YouTube embed |
+| `coverImageFile` | `string` | Absolute path to a local image file |
+| `coverImageFileCaption` | `string` | Caption for local image |
+| `coverImageQuery` | `string` | Unsplash search term |
+| `coverImageQueryCaption` | `string` | Caption for Unsplash image |
+
+Cover media insertion order: YouTube → local file → Unsplash. Insertion is non-fatal — the article saves even if a cover image step fails.
+
+### `get-my-articles`
+Returns all your stories (published + drafts) with `postId`, title, URL, and status.
+
+### `get-article-content`
+Extracts full content from a published article URL or a draft `/edit` URL.
+
+```json
+{ "url": "https://medium.com/p/<postId>/edit" }
 ```
 
-### 2. `get-my-articles`
-Retrieve your published Medium articles
-```typescript
-// No parameters needed
-// Returns: Array of your articles with titles, URLs, and dates
+### `search-medium`
+Searches Medium by keywords.
+
+```json
+{ "keywords": ["playwright", "mcp"] }
 ```
 
-### 3. `get-article-content`
-Get full content of any Medium article
-```typescript
-{
-  url: string  // Medium article URL
-}
+### `delete-draft`
+Deletes a draft story. **Refuses to delete published articles** — if the `postId` redirects away from `/edit`, the tool returns an error without touching anything.
+
+```json
+{ "postId": "abc123def456" }
 ```
 
-### 4. `search-medium`
-Search Medium for articles by keywords
-```typescript
-{
-  keywords: string[]  // Array of search terms
-}
-```
+## Content formatting syntax
 
-### 5. `login-to-medium`
-Manually trigger login process
-```typescript
-// No parameters needed
-// Opens browser for login if not already authenticated
-```
+| Syntax | Result |
+|---|---|
+| `# Heading` | H3 section heading |
+| `## Heading` | H4 subheading |
+| `**text**` | Bold |
+| `*text*` | Italic |
+| `` `code` `` | Inline code |
+| `[text](url)` | Link |
+| `> text` | Blockquote |
+| ` ```lang\n...\n``` ` | Code block |
+| `---` | Divider |
+| `^T` at paragraph start | Drop cap (must be uppercase letter) |
+| Blank line | Paragraph break |
 
-## How It Works
+## GitHub Copilot CLI skill
 
-### First Time Setup
-1. **Run the server** - It will open a Chrome browser window
-2. **Login to Medium** - Complete login in the opened browser
-3. **Session saved** - Your login session is saved locally
-4. **Future runs** - No login required, runs headlessly
-
-### Browser Automation Flow
-```
-User Request → MCP Server → Playwright Browser → Medium Website → Response
-```
-
-### Session Management
-- Login session stored in `medium-session.json`
-- Automatically reused on subsequent runs
-- Re-login only if session expires
-
-## Example Usage with Claude
+This repo ships a ready-to-use skill for the [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) agent:
 
 ```
-User: "Publish an article titled 'AI in 2025' with content about recent developments"
-
-Claude: Uses publish-article tool →
-- Opens Medium editor
-- Fills in title and content
-- Publishes article
-- Returns success with article URL
+.copilot/skills/medium-publish/SKILL.md
 ```
 
-## Troubleshooting
+Install it by copying to your user skills directory:
 
-### Browser Issues
-- **Browser won't open**: Check if Chromium is installed (`npx playwright install chromium`)
-- **Login fails**: Clear `medium-session.json` and try again
-- **Slow performance**: Browser automation takes 10-30 seconds per operation
+```bash
+mkdir -p ~/.copilot/skills/medium-publish
+cp .copilot/skills/medium-publish/SKILL.md ~/.copilot/skills/medium-publish/SKILL.md
+```
 
-### Medium Changes
-- **Selectors outdated**: Medium occasionally changes their website structure
-- **Login blocked**: Use your regular browser to login first, then try again
+The skill covers the full publishing workflow — login, drafting, cover images with captions, reading drafts, publishing, and safe draft deletion.
 
-### Common Errors
-- `Browser not initialized`: Restart the server
-- `Login timeout`: Increase timeout in browser-client.ts
-- `Element not found`: Medium may have changed their UI
+## Project structure
 
-## Development
-
-### Project Structure
 ```
 src/
-├── index.ts           # Main MCP server
-├── browser-client.ts  # Playwright automation
-├── auth.ts           # Legacy auth (unused)
-└── client.ts         # Legacy API client (unused)
+├── index.ts           # MCP server and tool definitions
+├── browser-client.ts  # Playwright automation and all Medium interactions
+├── auth.ts            # Legacy (unused)
+└── client.ts          # Legacy (unused)
+.copilot/
+└── skills/
+    └── medium-publish/
+        └── SKILL.md   # Copilot CLI skill
 ```
-
-### Testing
-```bash
-# Test browser automation
-node test-browser.js
-
-# Run MCP server
-npm start
-
-# Build project
-npm run build
-```
-
-## Security Notes
-- ✅ **Local only** - No data sent to external servers
-- ✅ **Session encryption** - Browser handles all security
-- ✅ **No API keys** - Uses your existing Medium login
-- ⚠️ **Browser storage** - Session saved locally in JSON file
 
 ## Limitations
-- **Speed**: Browser automation is slower than API calls (10-30s vs 1-2s)
-- **Reliability**: Dependent on Medium's website structure
-- **Headless**: Requires display for initial login (can run headless after)
-- **Rate limits**: Subject to Medium's normal usage limits
+
+- Browser automation is slower than a native API (10–30 s per operation)
+- Dependent on Medium's HTML structure — selectors may need updates if Medium changes their UI
+- Google login sessions are less persistent than email/password; prefer email/password
+- Subject to Medium's normal rate limits (max 2 published stories per 24 hours)
 
 ## Contributing
-Contributions welcome! Please read CONTRIBUTING.md for guidelines.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome, especially for selector resilience and new tool ideas.
 
 ## License
-MIT License - see LICENSE file for details.
 
-## Support
-- 🐛 **Issues**: GitHub Issues
-- 💬 **Discussions**: GitHub Discussions
-- 📧 **Email**: [Contact Author]
-
-## 🤖 CREDIT and DISCLAIMER
-
-### AI-Powered Development
-This entire Medium MCP Server was **developed by AI (Claude/Cursor AI) in just a few hours**, demonstrating the remarkable power of AI-assisted development. The complete rewrite from deprecated API to browser automation, including all TypeScript code, documentation, error handling, and testing strategies, was generated through AI collaboration.
-
-### What This Demonstrates
-- ✅ **AI-First Development**: Complex browser automation and MCP integration built rapidly
-- ✅ **Real-world Problem Solving**: Adapted to Medium's API deprecation with working solution
-- ✅ **Production-Ready Code**: TypeScript, error handling, session management, comprehensive docs
-- ✅ **Community Standards**: Contributing guidelines, changelog, proper licensing
-
-### Current Status & Limitations
-- ✅ **Functional**: Works well in Claude MCP integration for core features
-- ⚠️ **Google Login Sessions**: Couldn't solve persistent Google login sessions (use email/password instead)
-- ⚠️ **Short Development Time**: Rapid development may have overlooked edge cases
-- ⚠️ **Medium UI Changes**: Selectors may break if Medium updates their interface
-
-### Honest Assessment
-This tool is **useful and functional** for AI-powered content workflows, but comes with the inherent limitations of:
-- **Rapid AI development** - may miss nuanced edge cases that human developers would catch
-- **Browser automation complexity** - dependent on Medium's website structure
-- **Session management challenges** - Google's anti-automation measures
-
-### Feedback Welcome
-Given the accelerated AI development process, **I welcome any feedback, bug reports, or improvements**. This serves as both a working tool and a demonstration of AI development capabilities and limitations.
-
-**Use at your own discretion** - this is provided "as-is" with the understanding that rapid AI development, while powerful, may not cover all production scenarios.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-**Note**: This is an unofficial tool and is not affiliated with Medium. Use responsibly and in accordance with Medium's Terms of Service.
+**Note**: Unofficial tool, not affiliated with Medium. Use in accordance with [Medium's Terms of Service](https://policy.medium.com/medium-terms-of-service-9db0094a1e0f).

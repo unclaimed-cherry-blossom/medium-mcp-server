@@ -5,7 +5,36 @@ All notable changes to Medium MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-05-05
+
+### Added
+- **Cover media** — Unsplash search, local file upload, and YouTube embed; all three types supported in a single `publish-article` call, inserted sequentially after the title
+- **Captions** — `coverImageYoutubeCaption`, `coverImageFileCaption`, `coverImageQueryCaption` parameters; uses figcaption count-based waiting for reliable insertion
+- **`delete-draft` tool** — deletes a draft story by `postId`; hard guardrail refuses to delete published articles (detects redirect away from `/edit`)
+- **Draft reading** — `get-article-content` now works on `/edit` draft URLs by extracting content from the editor DOM instead of the published article DOM
+- **`get-my-articles` includes drafts** — returns both published and draft stories with `postId` and `status` fields
+- **GitHub Copilot CLI skill** — `.copilot/skills/medium-publish/SKILL.md` for use with the Copilot CLI agent
+
+### Changed
+- `publish-article` cover image logic changed from `else if` (one type only) to sequential insertion (all three types in one call)
+- `clickPlusButton()` now uses `window.getSelection()` caret rect for accurate `+` button hover positioning
+- Unsplash image selection uses real mouse coordinates (`page.mouse.move` + `page.mouse.click`) instead of DOM `.click()` to avoid pointer-events blocking
+- Unsplash search field uses `keyboard.type()` on a `contenteditable` div instead of `.fill()` on an `<input>`
+- `delete-draft` navigates to `/p/{postId}/settings` via the `···` menu → "More settings" → "Delete story" button → confirmation modal (`[data-testid="deleteStoryModalConfirmButton"]`)
+
+### Fixed
+- Cover image `+` button hover now reliably opens the popover by using the editor caret position
+- YouTube caption insertion timing fixed with figcaption count-based waiting
+
 ## [1.0.0] - 2024-07-08
+
+### Added
+- **Browser-based automation** using Playwright instead of deprecated Medium API
+- **MCP Tools**: `publish-article`, `get-my-articles`, `search-medium`, `get-article-content`, `login-to-medium`
+- **Session persistence** via `medium-session.json`
+- **Anti-detection measures** for realistic browser automation
+- **Robust content extraction** handling both preview and full article content
+
 
 ### 🎉 Initial Release
 
